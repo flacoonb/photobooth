@@ -347,6 +347,10 @@ const photoBooth = (function () {
             ioClient.emit('photobooth-socket', 'in progress');
         }
 
+        if (config.pre_photo.cmd) {
+            api.preCommand();
+        }
+
         if (config.previewCamBackground) {
             wrapper.css('background-color', config.colors.panel);
         }
@@ -413,10 +417,6 @@ const photoBooth = (function () {
 
         if (config.remotebuzzer_enabled) {
             ioClient.emit('photobooth-socket', 'in progress');
-        }
-
-        if (config.pre_photo.cmd) {
-            api.preCommand();
         }
 
         if (config.preview_mode === 'device_cam' || config.preview_mode === 'gphoto') {
