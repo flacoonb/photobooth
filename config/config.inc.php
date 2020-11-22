@@ -233,6 +233,8 @@ $config['exiftool']['cmd'] = null;
 $config['exiftool']['msg'] = null;
 $config['preview']['cmd'] = null;
 $config['preview']['killcmd'] = null;
+$config['pre_photo']['cmd'] = null;
+$config['post_photo']['cmd'] = null;
 
 
 // R E M O T E   B U Z Z E R

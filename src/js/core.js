@@ -28,7 +28,8 @@ const photoBooth = (function () {
         currentCollageFile = '',
         imgFilter = config.default_imagefilter,
         ioClient,
-        pid;
+        pid,
+        command;
 
     const modal = {
         open: function (selector) {
@@ -305,6 +306,34 @@ const photoBooth = (function () {
         }
     };
 
+    api.preCommand = function () {
+        command = {
+            mode: 'pre-command'
+        };
+        jQuery
+            .post('api/preCommand.php', command)
+            .done(function (result) {
+                console.log('Pre-photo command: ', result);
+            })
+            .fail(function (xhr, status, result) {
+                console.log('Pre-photo command: ', result);
+            });
+    };
+
+    api.postCommand = function () {
+        command = {
+            mode: 'post-command'
+        };
+        jQuery
+            .post('api/postCommand.php', command)
+            .done(function (result) {
+                console.log('Post-photo command: ', result);
+            })
+            .fail(function (xhr, status, result) {
+                console.log('Post-photo command: ', result);
+            });
+    };
+
     api.thrill = function (photoStyle) {
         api.closeNav();
         api.reset();
@@ -384,6 +413,10 @@ const photoBooth = (function () {
 
         if (config.remotebuzzer_enabled) {
             ioClient.emit('photobooth-socket', 'in progress');
+        }
+
+        if (config.pre_photo.cmd) {
+            api.preCommand();
         }
 
         if (config.preview_mode === 'device_cam' || config.preview_mode === 'gphoto') {
@@ -721,6 +754,10 @@ const photoBooth = (function () {
             count++;
             if (config.preview_mode === 'gphoto' && count === stop) {
                 api.stopPreviewVideo();
+            }
+
+            if (config.post_photo.cmd && count === stop) {
+                api.postCommand();
             }
         }
         timerFunction();

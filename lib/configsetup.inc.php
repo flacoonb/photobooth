@@ -1087,6 +1087,18 @@ $configsetup = [
 			'placeholder' => 'preview_killcmd',
 			'name' => 'preview[killcmd]',
 			'value' => htmlentities($config['preview']['killcmd'])
+		],
+		'pre_photo_cmd' => [
+			'type' => 'input',
+			'placeholder' => 'pre_photo_cmd',
+			'name' => 'pre_photo[cmd]',
+			'value' => htmlentities($config['pre_photo']['cmd'])
+		],
+		'post_photo_cmd' => [
+			'type' => 'input',
+			'placeholder' => 'post_photo_cmd',
+			'name' => 'post_photo[cmd]',
+			'value' => htmlentities($config['post_photo']['cmd'])
 		]
 	],
 	'remotebuzzer' => [
