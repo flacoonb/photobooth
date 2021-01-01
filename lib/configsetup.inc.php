@@ -265,6 +265,7 @@ $configsetup = [
                 '2x2' => '2x2',
                 '2x4' => '2x4',
                 '2x4BI' => '2x4 + background image',
+                '1+3BI' => '1+3 + background image',
             ],
             'value' => $config['collage_layout'],
         ],
