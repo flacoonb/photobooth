@@ -15,12 +15,12 @@ function processIsRunning($pName, $pidFile) {
     return count($output) - 1 ? true : false; // true if process is active
 }
 
-if ($config['remotebuzzer_enabled']) {
-    $connection = @fsockopen('127.0.0.1', $config['remotebuzzer_port']);
+if ($config['remotebuzzer']['enabled']) {
+    $connection = @fsockopen('127.0.0.1', $config['remotebuzzer']['port']);
 
     if (!is_resource($connection)) {
-        if ($config['dev']) {
-            $logfile = $config['foldersAbs']['tmp'] . '/' . $config['remotebuzzer_logfile'];
+        if ($config['dev']['enabled']) {
+            $logfile = $config['foldersAbs']['tmp'] . DIRECTORY_SEPARATOR . $config['remotebuzzer']['logfile'];
         } else {
             $logfile = '/dev/null';
         }
@@ -35,14 +35,14 @@ if ($config['remotebuzzer_enabled']) {
     print "\t<script type=\"text/javascript\" src=\"node_modules/socket.io-client/dist/socket.io.min.js\"></script>\n";
 }
 
-if ($config['synctodrive_enabled']) {
-    if ($config['dev']) {
-        $logfile = $config['foldersAbs']['tmp'] . '/' . $config['synctodrive_logfile'];
+if ($config['synctodrive']['enabled']) {
+    if ($config['dev']['enabled']) {
+        $logfile = $config['foldersAbs']['tmp'] . DIRECTORY_SEPARATOR . $config['synctodrive']['logfile'];
     } else {
         $logfile = '/dev/null';
     }
 
-    if (processIsRunning('sync-to-drive.js', $config['foldersAbs']['tmp'] . '/synctodrive_server.pid')) {
+    if (processIsRunning('sync-to-drive.js', $config['foldersAbs']['tmp'] . DIRECTORY_SEPARATOR . 'synctodrive_server.pid')) {
         print "\t<!-- Sync To Drive enabled --- server already active -->\n";
     } else {
         print "\t<!-- Sync To Drive enabled --- starting server -->\n";

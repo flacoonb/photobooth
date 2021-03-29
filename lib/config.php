@@ -26,6 +26,9 @@ $cmds = [
         'nodebin' => [
             'cmd' => '',
         ],
+        'shutdown' => [
+            'cmd' => '',
+        ],
     ],
     'linux' => [
         'take_picture' => [
@@ -47,32 +50,41 @@ $cmds = [
         'nodebin' => [
             'cmd' => '/usr/bin/node',
         ],
+        'shutdown' => [
+            'cmd' => '/sbin/shutdown -h now',
+        ],
     ],
 ];
 
 $mailTemplates = [
     'de' => [
-        'mail_subject' => 'Hier ist dein Bild',
-        'mail_text' => 'Hey, dein Bild ist angehangen.',
+        'mail' => [
+            'subject' => 'Hier ist dein Bild',
+            'text' => 'Hey, dein Bild ist angehangen.',
+        ],
     ],
     'en' => [
-        'mail_subject' => 'Here is your picture',
-        'mail_text' => 'Hey, your picture is attached.',
+        'mail' => [
+            'subject' => 'Here is your picture',
+            'text' => 'Hey, your picture is attached.',
+        ],
     ],
     'es' => [
-        'mail_subject' => 'Aquí está tu foto',
-        'mail_text' => 'Hola, tu foto está adjunta.',
+        'mail' => [
+            'subject' => 'Aquí está tu foto',
+            'text' => 'Hola, tu foto está adjunta.',
+        ],
     ],
     'fr' => [
-        'mail_subject' => 'Voici votre photo',
-        'mail_text' => 'Hé, ta photo est attachée.',
+        'mail' => [
+            'subject' => 'Voici votre photo',
+            'text' => 'Hé, ta photo est attachée.',
+        ],
     ],
 ];
 
 require_once $default_config_file;
 
-$config['mail_subject'] = $mailTemplates[$config['language']]['mail_subject'];
-$config['mail_text'] = $mailTemplates[$config['language']]['mail_text'];
 $config['take_picture']['cmd'] = $cmds[$os]['take_picture']['cmd'];
 $config['take_picture']['msg'] = $cmds[$os]['take_picture']['msg'];
 $config['print']['cmd'] = $cmds[$os]['print']['cmd'];
@@ -82,36 +94,59 @@ $config['exiftool']['msg'] = $cmds[$os]['exiftool']['msg'];
 $config['preview']['cmd'] = $cmds[$os]['preview']['cmd'];
 $config['preview']['killcmd'] = $cmds[$os]['preview']['killcmd'];
 $config['nodebin']['cmd'] = $cmds[$os]['nodebin']['cmd'];
+$config['shutdown']['cmd'] = $cmds[$os]['shutdown']['cmd'];
 
-$config['collage_limit'] = 4;
+$config['adminpanel']['view_default'] = 'expert';
 
-$config['remotebuzzer_logfile'] = 'remotebuzzer_server.log';
-$config['synctodrive_logfile'] = 'synctodrive_server.log';
+$config['remotebuzzer']['logfile'] = 'remotebuzzer_server.log';
+$config['synctodrive']['logfile'] = 'synctodrive_server.log';
+
+$config['ui']['github'] = 'andi34';
+$config['ui']['branding'] = 'Photobooth';
 
 $defaultConfig = $config;
 
 if (file_exists($my_config_file)) {
     require_once $my_config_file;
 
+    if (!isset($config['mail']['subject'])) {
+        if (isset($config['ui']['language'])) {
+            $config['mail']['subject'] = $mailTemplates[$config['ui']['language']]['mail']['subject'];
+        } else {
+            $config['mail']['subject'] = $mailTemplates[$defaultConfig['ui']['language']]['mail']['subject'];
+        }
+    }
+    if (!isset($config['mail']['text'])) {
+        if (isset($config['ui']['language'])) {
+            $config['mail']['text'] = $mailTemplates[$config['ui']['language']]['mail']['text'];
+        } else {
+            $config['mail']['text'] = $mailTemplates[$defaultConfig['ui']['language']]['mail']['text'];
+        }
+    }
+
     $config = array_deep_merge($defaultConfig, $config);
 }
 
-if ($config['dev']) {
+if ($config['dev']['enabled']) {
     ini_set('display_errors', 1);
     ini_set('display_startup_errors', 1);
     error_reporting(E_ALL);
 }
 
-if (!isset($config['background_image'])) {
-    $config['background_image'] = 'url(../img/bg_bluegray.jpg)';
+if (!isset($config['collage']['limit'])) {
+    $config['collage']['limit'] = 4;
 }
 
-if (!isset($config['background_admin'])) {
-    $config['background_admin'] = 'url(../img/bg_bluegray.jpg)';
+if (!isset($config['background']['defaults'])) {
+    $config['background']['defaults'] = 'url(' . getrootpath('../resources/img/bg_bluegray.jpg') . ')';
 }
 
-if (!isset($config['background_chroma'])) {
-    $config['background_chroma'] = 'url(../img/bg_bluegray.jpg)';
+if (!isset($config['background']['admin'])) {
+    $config['background']['admin'] = 'url(' . getrootpath('../resources/img/bg_bluegray.jpg') . ')';
+}
+
+if (!isset($config['background']['chroma'])) {
+    $config['background']['chroma'] = 'url(' . getrootpath('../resources/img/bg_bluegray.jpg') . ')';
 }
 
 if (file_exists($my_config_file) && !is_writable($my_config_file)) {
@@ -120,8 +155,15 @@ if (file_exists($my_config_file) && !is_writable($my_config_file)) {
     die('Abort. Can not create config/my.config.inc.php. Config folder is not writable.');
 }
 
+$basepath = __DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR;
+
 foreach ($config['folders'] as $key => $folder) {
-    $path = __DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . $folder;
+    if ($folder === 'data' || $folder === 'archives') {
+        $path = $basepath . DIRECTORY_SEPARATOR . $folder;
+    } else {
+        $path = $basepath . DIRECTORY_SEPARATOR . $config['folders']['data'] . DIRECTORY_SEPARATOR . $folder;
+        $config['foldersRoot'][$key] = $config['folders']['data'] . DIRECTORY_SEPARATOR . $folder;
+    }
 
     if (!file_exists($path)) {
         if (!mkdir($path, 0755, true)) {
@@ -133,4 +175,10 @@ foreach ($config['folders'] as $key => $folder) {
 
     $path = realpath($path);
     $config['foldersAbs'][$key] = $path;
+}
+
+function getrootpath($relative_path) {
+    $realpath = realpath($relative_path);
+    $rootpath = str_replace($_SERVER['DOCUMENT_ROOT'], '', $realpath);
+    return $rootpath;
 }

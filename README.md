@@ -60,7 +60,7 @@ This is my personal Photobooth fork with some extras on top (more information ca
   - standalone slideshow via [localhost/slideshow](http://localhost/slideshow)
   - access login via [localhost/login](http://localhost/login) instead [localhost/login.php](http://localhost/login.php)
   - offline manual with settings explained under [localhost/manual](http://localhost/manual) ([andi34/photobooth#59](https://github.com/andi34/photobooth/pull/59))
-  - offline FAQ under [localhost/manual/faq.html](http://localhost/manual/faq.html)
+  - offline FAQ under [localhost/manual/faq.php](http://localhost/manual/faq.php)
   - disk usage page, access via admin panel or at [localhost/admin/diskusage.php](http://localhost/admin/diskusage.php)
   - fix windows compatibility
   - fix check for image filter
@@ -127,10 +127,7 @@ This is my personal Photobooth fork with some extras on top (more information ca
     - allow to trigger print via defined key
     - options to show the print button independent (e.g. can be only visible on gallery)
   - Advanced collage options [#108](https://github.com/andi34/photobooth/pull/108):
-    - Choose collage layout:
-      - 2x2
-      - 2x4
-      - 2x4 + background image
+    - Choose between different collage layouts
     - Collage: apply frame once after taking or to every picture of the collage
 
 ## :camera: Screenshots
@@ -208,3 +205,6 @@ If you like my work and like to keep me motivated you can buy me a coconut water
 - [EccoB](https://github.com/EccoB)
 - [couz74](https://github.com/couz74)
 - [thatonedude3470](https://github.com/thatonedude3470)
+- [Christian Tarne](https://github.com/Metropo)
+- [DeNeD1](https://github.com/DeNeD1)
+- [DIY89](https://github.com/DIY89)

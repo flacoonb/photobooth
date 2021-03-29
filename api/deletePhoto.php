@@ -47,7 +47,7 @@ if (is_readable($filePathKeying)) {
     }
 }
 
-if (!$config['keep_images']) {
+if (!$config['picture']['keep_original']) {
     if (is_readable($filePathTmp)) {
         if (!unlink($filePathTmp)) {
             die(
@@ -59,7 +59,9 @@ if (!$config['keep_images']) {
     }
 }
 
-deleteImageFromDB($file);
+if ($config['database']['enabled']) {
+    deleteImageFromDB($file);
+}
 
 echo json_encode([
     'success' => true,

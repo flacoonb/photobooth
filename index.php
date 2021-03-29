@@ -1,26 +1,41 @@
 <?php
 session_start();
 
-require_once('lib/config.php');
-require_once('lib/db.php');
-require_once('lib/filter.php');
-
-$images = getImagesFromDB();
-$imagelist = ($config['newest_first'] === true) ? array_reverse($images) : $images;
-
-if ($config['index_style'] === 'modern') {
-	$btnClass1 = 'round-btn';
-	$btnClass2 = 'round-btn';
-	$galleryIcon = 'fa-picture-o';
-} else {
-	$btnClass1 = 'btn';
-	$btnClass2 = '';
-	$galleryIcon = 'fa-th';
+require_once 'lib/config.php';
+if ($config['live_keying']['enabled']) {
+    header('location: livechroma.php');
 }
 
-if ($config['use_live_keying']):
-header("location: livechroma.php");
-endif;
+// Login / Authentication check
+if (
+    !$config['login']['enabled'] ||
+    (!$config['protect']['localhost_index'] && $_SERVER['REMOTE_ADDR'] === $_SERVER['SERVER_ADDR']) ||
+    ((isset($_SESSION['auth']) && $_SESSION['auth'] === true) || !$config['protect']['index'])
+) {
+    require_once 'lib/db.php';
+    require_once 'lib/filter.php';
+
+    if ($config['database']['enabled']) {
+        $images = getImagesFromDB();
+    } else {
+        $images = getImagesFromDirectory($config['foldersAbs']['images']);
+    }
+
+    $imagelist = $config['gallery']['newest_first'] === true ? array_reverse($images) : $images;
+
+    if ($config['ui']['style'] === 'modern') {
+        $btnClass1 = 'round-btn';
+        $btnClass2 = 'round-btn';
+        $galleryIcon = 'fa-picture-o';
+    } else {
+        $btnClass1 = 'btn';
+        $btnClass2 = '';
+        $galleryIcon = 'fa-th';
+    }
+} else {
+    header('location: login');
+    exit();
+}
 ?>
 <!DOCTYPE html>
 <html>
@@ -31,7 +46,7 @@ endif;
 	<meta name="msapplication-TileColor" content="<?=$config['colors']['primary']?>">
 	<meta name="theme-color" content="<?=$config['colors']['primary']?>">
 
-	<title>Photobooth</title>
+	<title><?=$config['ui']['branding']?></title>
 
 	<!-- Favicon + Android/iPhone Icons -->
 	<link rel="apple-touch-icon" sizes="180x180" href="resources/img/apple-touch-icon.png">
@@ -48,11 +63,11 @@ endif;
 	<link rel="stylesheet" href="node_modules/font-awesome/css/font-awesome.css" />
 	<link rel="stylesheet" href="vendor/PhotoSwipe/dist/photoswipe.css" />
 	<link rel="stylesheet" href="vendor/PhotoSwipe/dist/default-skin/default-skin.css" />
-	<link rel="stylesheet" href="resources/css/<?php echo $config['index_style']; ?>_style.css" />
-	<?php if ($config['gallery_bottom_bar']): ?>
+	<link rel="stylesheet" href="resources/css/<?php echo $config['ui']['style']; ?>_style.css" />
+	<?php if ($config['gallery']['bottom_bar']): ?>
 	<link rel="stylesheet" href="resources/css/photoswipe-bottom.css" />
 	<?php endif; ?>
-	<?php if ($config['rounded_corners'] && $config['index_style'] === 'classic'): ?>
+	<?php if ($config['ui']['rounded_corners'] && $config['ui']['style'] === 'classic'): ?>
 	<link rel="stylesheet" href="resources/css/rounded.css" />
 	<?php endif; ?>
 </head>
@@ -60,19 +75,17 @@ endif;
 <video id="video--preview" autoplay playsinline></video>
 <body class="deselect">
 	<div id="wrapper">
-	<?php if( !$config['login_enabled'] || (isset($_SESSION['auth']) && $_SESSION['auth'] === true || !$config['protect_index'])): ?>
-
-		<?php include('template/' . $config['index_style'] . '.template.php'); ?>
+		<?php include('template/' . $config['ui']['style'] . '.template.php'); ?>
 
 		<!-- image Filter Pane -->
-		<?php if ($config['use_filter']): ?>
-		<div id="mySidenav" class="dragscroll sidenav">
-			<a href="#" class="closebtn <?php echo $btnClass2; ?>"><i class="fa fa-times"></i></a>
+		<?php if ($config['filters']['enabled']): ?>
+		<div id="mySidenav" class="dragscroll sidenav rotarygroup">
+			<a href="#" class="closebtn <?php echo $btnClass2; ?> rotaryfocus"><i class="fa fa-times"></i></a>
 
 			<?php foreach(AVAILABLE_FILTERS as $filter => $name): ?>
-				<?php if (!in_array($filter, $config['disabled_filters'])): ?>
-					<div id="<?=$filter?>" class="filter <?php if($config['default_imagefilter'] === $filter)echo 'activeSidenavBtn'; ?>">
-						<a class="btn btn--small" href="#"><?=$name?></a>
+				<?php if (!in_array($filter, $config['filters']['disabled'])): ?>
+					<div id="<?=$filter?>" class="filter <?php if($config['filters']['defaults'] === $filter)echo 'activeSidenavBtn'; ?>">
+						<a class="btn btn--small rotaryfocus" href="#"><?=$name?></a>
 					</div>
 				<?php endif; ?>
 			<?php endforeach; ?>
@@ -94,56 +107,59 @@ endif;
 					<canvas id="video--sensor"></canvas>
 				</div>
 				<div class="cheese"></div>
-				<div class="loading"></div>
+				<div class="loaderImage"></div>
+				<div class="loading rotarygroup"></div>
 			</div>
 		</div>
 
 		<!-- Result Page -->
-		<div class="stages" id="result">
-			<a href="#" class="<?php echo $btnClass1; ?> homebtn"><i class="fa fa-home"></i> <span data-i18n="home"></span></a>
+		<div class="stages rotarygroup" id="result">
+			<a href="#" class="<?php echo $btnClass1; ?> homebtn rotaryfocus"><i class="fa fa-home"></i> <span data-i18n="home"></span></a>
 			<div class="resultInner hidden">
-				<?php if ($config['show_gallery']): ?>
-				<a href="#" class="<?php echo $btnClass1; ?> gallery-button"><i class="fa <?php echo $galleryIcon; ?>"></i> <span data-i18n="gallery"></span></a>
+				<?php if ($config['gallery']['enabled']): ?>
+				<a href="#" class="<?php echo $btnClass1; ?> gallery-button rotaryfocus" ><i class="fa <?php echo $galleryIcon; ?>"></i> <span data-i18n="gallery"></span></a>
 				<?php endif; ?>
 
-				<?php if ($config['use_qr']): ?>
-				<a href="#" class="<?php echo $btnClass1; ?> qrbtn"><i class="fa fa-qrcode"></i> <span data-i18n="qr"></span></a>
+				<?php if ($config['qr']['enabled']): ?>
+				<a href="#" class="<?php echo $btnClass1; ?> qrbtn rotaryfocus"><i class="fa fa-qrcode"></i> <span data-i18n="qr"></span></a>
 				<?php endif; ?>
 
-				<?php if ($config['use_mail']): ?>
-				<a href="#" class="<?php echo $btnClass1; ?> mailbtn"><i class="fa fa-envelope"></i> <span data-i18n="mail"></span></a>
+				<?php if ($config['mail']['enabled']): ?>
+				<a href="#" class="<?php echo $btnClass1; ?> mailbtn rotaryfocus"><i class="fa fa-envelope"></i> <span data-i18n="mail"></span></a>
 				<?php endif; ?>
 
-				<?php if ($config['use_print_result']): ?>
-				<a href="#" class="<?php echo $btnClass1; ?> printbtn"><i class="fa fa-print"></i> <span data-i18n="print"></span></a>
+				<?php if ($config['print']['from_result']): ?>
+				<a href="#" class="<?php echo $btnClass1; ?> printbtn rotaryfocus"><i class="fa fa-print"></i> <span data-i18n="print"></span></a>
 				<?php endif; ?>
 
-				<?php if (!$config['force_buzzer']): ?>
-					<a href="#" class="<?php echo $btnClass1; ?> newpic"><i class="fa fa-camera"></i> <span data-i18n="newPhoto"></span></a>
+				<?php if (!$config['button']['force_buzzer']): ?>
+					<?php if (!($config['collage']['enabled'] && $config['collage']['only'])): ?>
+					<a href="#" class="<?php echo $btnClass1; ?> newpic rotaryfocus"><i class="fa fa-camera"></i> <span data-i18n="newPhoto"></span></a>
+					<?php endif; ?>
 
-					<?php if ($config['use_collage']): ?>
-					<a href="#" class="<?php echo $btnClass1; ?> newcollage"><i class="fa fa-th-large"></i> <span
+					<?php if ($config['collage']['enabled']): ?>
+					<a href="#" class="<?php echo $btnClass1; ?> newcollage rotaryfocus"><i class="fa fa-th-large"></i> <span
 							data-i18n="newCollage"></span></a>
 					<?php endif; ?>
 				<?php endif; ?>
 
-				<?php if ($config['use_filter']): ?>
-				<a href="#" class="<?php echo $btnClass1; ?> imageFilter"><i class="fa fa-magic"></i> <span data-i18n="selectFilter"></span></a>
+				<?php if ($config['filters']['enabled']): ?>
+				<a href="#" class="<?php echo $btnClass1; ?> imageFilter rotaryfocus"><i class="fa fa-magic"></i> <span data-i18n="selectFilter"></span></a>
 				<?php endif; ?>
 
-				<?php if ($config['allow_delete']): ?>
+				<?php if ($config['picture']['allow_delete']): ?>
 				<a href="#" class="<?php echo $btnClass1; ?> deletebtn"><i class="fa fa-trash"></i> <span data-i18n="delete"></span></a>
 				<?php endif; ?>
 			</div>
 
-			<?php if ($config['use_qr']): ?>
+			<?php if ($config['qr']['enabled']): ?>
 			<div id="qrCode" class="modal">
 				<div class="modal__body"></div>
 			</div>
 			<?php endif; ?>
 		</div>
 
-		<?php if ($config['show_gallery']): ?>
+		<?php if ($config['gallery']['enabled']): ?>
 		<?php include('template/gallery.template.php'); ?>
 		<?php endif; ?>
 	</div>
@@ -157,12 +173,12 @@ endif;
 			<input class="mail-form-input" size="35" type="email" name="sendTo">
 			<input id="mail-form-image" type="hidden" name="image" value="">
 
-			<?php if ($config['send_all_later']): ?>
+			<?php if ($config['mail']['send_all_later']): ?>
 				<input type="checkbox" id="mail-form-send-link" name="send-link" value="yes">
 				<label data-i18n="sendAllMail" for="mail-form-send-link"></label>
 			<?php endif; ?>
 
-			<button class="mail-form-input btn" name="submit" type="submit" value="Send"><span data-i18n="send"></span></button>
+			<button class="mail-form-input btn rotaryfocus" name="submit" type="submit" value="Send"><span data-i18n="send"></span></button>
 		</form>
 
 		<div id="mail-form-message" style="max-width: 75%"></div>
@@ -176,10 +192,6 @@ endif;
 		<div style="position:absolute; bottom:0; right:0;">
 			<img src="resources/img/spacer.png" alt="adminsettings" ondblclick="adminsettings()" />
 		</div>
-	<?php else:
-	header("location: login");
-	exit;
-	endif; ?>
 	</div>
 
 	<script src="node_modules/whatwg-fetch/dist/fetch.umd.js"></script>
@@ -188,6 +200,7 @@ endif;
 	<script type="text/javascript" src="node_modules/jquery/dist/jquery.min.js"></script>
 	<script type="text/javascript" src="vendor/PhotoSwipe/dist/photoswipe.min.js"></script>
 	<script type="text/javascript" src="vendor/PhotoSwipe/dist/photoswipe-ui-default.min.js"></script>
+	<script type="text/javascript" src="resources/js/remotebuzzer_client.js"></script>
 	<script type="text/javascript" src="resources/js/photoinit.js"></script>
 	<script type="text/javascript" src="resources/js/theme.js"></script>
 	<script type="text/javascript" src="resources/js/core.js"></script>

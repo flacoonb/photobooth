@@ -4,6 +4,8 @@ header('Content-Type: application/json');
 require_once '../lib/config.php';
 require_once '../lib/db.php';
 require_once '../lib/resize.php';
+require_once '../lib/applyFrame.php';
+require_once '../lib/applyText.php';
 
 if (empty($_GET['filename'])) {
     die(
@@ -17,6 +19,7 @@ $filename = $_GET['filename'];
 $filename_source = $config['foldersAbs']['images'] . DIRECTORY_SEPARATOR . $filename;
 $filename_print = $config['foldersAbs']['print'] . DIRECTORY_SEPARATOR . $filename;
 $filename_codes = $config['foldersAbs']['qrcodes'] . DIRECTORY_SEPARATOR . $filename;
+$quality = 100;
 $status = false;
 
 // exit with error if file does not exist
@@ -40,43 +43,80 @@ if ($mimetype != 'image/jpg' && $mimetype != 'image/jpeg') {
 }
 
 // QR
-if (!isset($config['webserver_ip'])) {
+if (!isset($config['webserver']['ip'])) {
     $SERVER_IP = $_SERVER['HTTP_HOST'];
 } else {
-    $SERVER_IP = $config['webserver_ip'];
+    $SERVER_IP = $config['webserver']['ip'];
 }
 
 // text on print variables
-$fontpath = __DIR__ . DIRECTORY_SEPARATOR . $config['font_path'];
-$fontsize = $config['fontsize'];
-$fontlocx = $config['locationx'];
-$fontlocy = $config['locationy'];
-$linespacing = $config['linespace'];
-$fontrot = $config['rotation'];
+$fontpath = $config['textonprint']['font'];
+$fontcolor = $config['textonprint']['font_color'];
+$fontsize = $config['textonprint']['font_size'];
+$fontlocx = $config['textonprint']['locationx'];
+$fontlocy = $config['textonprint']['locationy'];
+$linespacing = $config['textonprint']['linespace'];
+$fontrot = $config['textonprint']['rotation'];
 $line1text = $config['textonprint']['line1'];
 $line2text = $config['textonprint']['line2'];
 $line3text = $config['textonprint']['line3'];
 
 // print frame
-$print_frame = __DIR__ . DIRECTORY_SEPARATOR . $config['print_frame_path'];
+$print_frame = realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . $config['print']['frame']);
+
+if ($config['print']['print_frame'] && !$config['picture']['take_frame']) {
+    if (is_dir($print_frame)) {
+        die(
+            json_encode([
+                'error' => 'Frame not set! ' . $print_frame . ' is a path but needs to be a png!',
+            ])
+        );
+    }
+
+    if (!file_exists($print_frame)) {
+        die(
+            json_encode([
+                'error' => 'Frame ' . $print_frame . ' does not exist!',
+            ])
+        );
+    }
+}
+
+if ($config['textonprint']['enabled']) {
+    if (is_dir(realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . $fontpath))) {
+        die(
+            json_encode([
+                'error' => 'Font not set! ' . $fontpath . ' is a path but needs to be a ttf!',
+            ])
+        );
+    }
+
+    if (!file_exists(realpath(__DIR__ . DIRECTORY_SEPARATOR . '..' . DIRECTORY_SEPARATOR . $fontpath))) {
+        die(
+            json_encode([
+                'error' => 'Font ' . $fontpath . ' does not exist!',
+            ])
+        );
+    }
+}
 
 if (!file_exists($filename_print)) {
     // rotate image if needed
     list($width, $height) = getimagesize($filename_source);
     if ($width > $height) {
         $image = imagecreatefromjpeg($filename_source);
-        imagejpeg($image, $filename_print);
+        imagejpeg($image, $filename_print, $quality);
         imagedestroy($image); // Destroy the created collage in memory
     } else {
         $image = imagecreatefromjpeg($filename_source);
         $resultRotated = imagerotate($image, 90, 0); // Rotate image
-        imagejpeg($resultRotated, $filename_print);
+        imagejpeg($resultRotated, $filename_print, $quality);
         imagedestroy($image); // Destroy the created collage in memory
         // re-define width & height after rotation
         list($width, $height) = getimagesize($filename_print);
     }
 
-    if ($config['print_qrcode']) {
+    if ($config['print']['qrcode']) {
         // create qr code
         if (!file_exists($filename_codes)) {
             include '../vendor/phpqrcode/qrlib.php';
@@ -88,65 +128,36 @@ if (!file_exists($filename_print)) {
         $newwidth = $width + $height / 2;
         $newheight = $height;
 
-        $source = imagecreatefromjpeg($filename_print);
-        $code = imagecreatefrompng($filename_codes);
-
-        if ($config['print_frame'] && !$config['take_frame']) {
-            $print = imagecreatefromjpeg($filename_print);
-            $frame = imagecreatefrompng($print_frame);
-            $frame = resizePngImage($frame, imagesx($print), imagesy($print));
-            $x = imagesx($print) / 2 - imagesx($frame) / 2;
-            $y = imagesy($print) / 2 - imagesy($frame) / 2;
-            imagecopy($print, $frame, $x, $y, 0, 0, imagesx($frame), imagesy($frame));
-            imagejpeg($print, $filename_print);
-            imagedestroy($print);
-            // $source needs to be redefined, picture with frame now exists inside $filename_print
-            imagedestroy($source);
-            $source = imagecreatefromjpeg($filename_print);
+        if ($config['print']['print_frame'] && !$config['picture']['take_frame']) {
+            ApplyFrame($filename_print, $filename_print, $print_frame);
         }
 
+        $source = imagecreatefromjpeg($filename_print);
+        $code = imagecreatefrompng($filename_codes);
         $print = imagecreatetruecolor($newwidth, $newheight);
 
         imagefill($print, 0, 0, imagecolorallocate($print, 255, 255, 255));
         imagecopy($print, $source, 0, 0, 0, 0, $width, $height);
         imagecopyresized($print, $code, $width, 0, 0, 0, $height / 2, $height / 2, imagesx($code), imagesy($code));
-
-        // text on image - start  - IMPORTANT  ensure you download Google Great Vibes font
-        if ($config['is_textonprint'] == true) {
-            $fontcolour = imagecolorallocate($print, 0, 0, 0); // colour of font
-            imagettftext($print, $fontsize, $fontrot, $fontlocx, $fontlocy, $fontcolour, $fontpath, $line1text);
-            imagettftext($print, $fontsize, $fontrot, $fontlocx, $fontlocy + $linespacing, $fontcolour, $fontpath, $line2text);
-            imagettftext($print, $fontsize, $fontrot, $fontlocx, $fontlocy + $linespacing * 2, $fontcolour, $fontpath, $line3text);
-        }
-        // text on image - end
-
-        imagejpeg($print, $filename_print);
+        imagejpeg($print, $filename_print, $quality);
         imagedestroy($code);
         imagedestroy($source);
+        imagedestroy($print);
     } else {
-        $print = imagecreatefromjpeg($filename_print);
-        if ($config['print_frame'] == true && !$config['take_frame']) {
-            $frame = imagecreatefrompng($print_frame);
-            $frame = resizePngImage($frame, imagesx($print), imagesy($print));
-            $x = imagesx($print) / 2 - imagesx($frame) / 2;
-            $y = imagesy($print) / 2 - imagesy($frame) / 2;
-            imagecopy($print, $frame, $x, $y, 0, 0, imagesx($frame), imagesy($frame));
+        if ($config['print']['print_frame'] && !$config['picture']['take_frame']) {
+            ApplyFrame($filename_print, $filename_print, $print_frame);
         }
-        // text on image - start  - IMPORTANT  ensure you download Google Great Vibes font
-        if ($config['is_textonprint'] == true) {
-            $fontcolour = imagecolorallocate($print, 0, 0, 0); // colour of font
-            imagettftext($print, $fontsize, $fontrot, $fontlocx, $fontlocy, $fontcolour, $fontpath, $line1text);
-            imagettftext($print, $fontsize, $fontrot, $fontlocx, $fontlocy + $linespacing, $fontcolour, $fontpath, $line2text);
-            imagettftext($print, $fontsize, $fontrot, $fontlocx, $fontlocy + $linespacing * 2, $fontcolour, $fontpath, $line3text);
-        }
-        //text on image - end
-        imagejpeg($print, $filename_print);
     }
-    imagedestroy($print);
 
-    if ($config['crop_onprint']) {
-        $crop_width = $config['crop_width'];
-        $crop_height = $config['crop_height'];
+    if ($config['textonprint']['enabled']) {
+        $print = imagecreatefromjpeg($filename_print);
+        ApplyText($filename_print, $fontsize, $fontrot, $fontlocx, $fontlocy, $fontcolor, $fontpath, $line1text, $line2text, $line3text, $linespacing);
+        imagedestroy($print);
+    }
+
+    if ($config['print']['crop']) {
+        $crop_width = $config['print']['crop_width'];
+        $crop_height = $config['print']['crop_height'];
         ResizeCropImage($crop_width, $crop_height, $filename_print, $filename_print);
     }
 }

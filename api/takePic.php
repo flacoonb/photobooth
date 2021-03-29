@@ -7,11 +7,11 @@ require_once '../lib/db.php';
 function takePicture($filename) {
     global $config;
 
-    if ($config['dev']) {
+    if ($config['dev']['enabled']) {
         $demoFolder = __DIR__ . '/../resources/img/demo/';
         $devImg = array_diff(scandir($demoFolder), ['.', '..']);
         copy($demoFolder . $devImg[array_rand($devImg)], $filename);
-    } elseif ($config['preview_mode'] === 'device_cam' && $config['previewCamTakesPic']) {
+    } elseif ($config['preview']['mode'] === 'device_cam' && $config['preview']['camTakesPic']) {
         $data = $_POST['canvasimg'];
         list($type, $data) = explode(';', $data);
         list(, $data) = explode(',', $data);
@@ -19,7 +19,7 @@ function takePicture($filename) {
 
         file_put_contents($filename, $data);
 
-        if ($config['previewCamFlipHorizontal']) {
+        if ($config['preview']['flipHorizontal']) {
             $im = imagecreatefromjpeg($filename);
             imageflip($im, IMG_FLIP_HORIZONTAL);
             imagejpeg($im, $filename);
@@ -56,21 +56,25 @@ function takePicture($filename) {
 
 if (!empty($_POST['file']) && preg_match('/^[a-z0-9_]+\.jpg$/', $_POST['file'])) {
     $name = $_POST['file'];
-} elseif ($config['file_naming'] === 'numbered') {
-    $images = getImagesFromDB();
+} elseif ($config['picture']['naming'] === 'numbered') {
+    if ($config['database']['enabled']) {
+        $images = getImagesFromDB();
+    } else {
+        $images = getImagesFromDirectory($config['foldersAbs']['images']);
+    }
     $img_number = count($images);
     $files = str_pad(++$img_number, 4, '0', STR_PAD_LEFT);
     $name = $files . '.jpg';
-} elseif ($config['file_naming'] === 'dateformatted') {
+} elseif ($config['picture']['naming'] === 'dateformatted') {
     $name = date('Ymd_His') . '.jpg';
 } else {
     $name = md5(time()) . '.jpg';
 }
 
-if ($config['db_file'] === 'db' || (!empty($_POST['file']) && preg_match('/^[a-z0-9_]+\.jpg$/', $_POST['file']))) {
+if ($config['database']['file'] === 'db' || (!empty($_POST['file']) && preg_match('/^[a-z0-9_]+\.jpg$/', $_POST['file']))) {
     $file = $name;
 } else {
-    $file = $config['db_file'] . '_' . $name;
+    $file = $config['database']['file'] . '_' . $name;
 }
 
 $filename_tmp = $config['foldersAbs']['tmp'] . DIRECTORY_SEPARATOR . $file;
@@ -96,25 +100,30 @@ if ($_POST['style'] === 'photo') {
 
     $number = $_POST['collageNumber'] + 0;
 
-    if ($number > 3) {
+    if ($number > $config['collage']['limit']) {
         die(
             json_encode([
-                'error' => 'Collage consists only of ' . $config['collage_limit'] . ' pictures',
+                'error' => 'Collage consists only of ' . $config['collage']['limit'] . ' pictures',
             ])
         );
     }
+
+    $basecollage = substr($file, 0, -4);
+    $collage_name = $basecollage . '-' . date('Ymd_His') . '.jpg';
 
     $basename = substr($filename_tmp, 0, -4);
     $filename = $basename . '-' . $number . '.jpg';
 
     takePicture($filename);
+    copy($filename, $config['foldersAbs']['tmp'] . DIRECTORY_SEPARATOR . $collage_name);
 
     die(
         json_encode([
             'success' => 'collage',
             'file' => $file,
+            'collage_file' => $collage_name,
             'current' => $number,
-            'limit' => $config['collage_limit'],
+            'limit' => $config['collage']['limit'],
         ])
     );
 } elseif ($_POST['style'] === 'chroma') {

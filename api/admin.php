@@ -12,7 +12,7 @@ if (!isset($data['type'])) {
 }
 
 if ($data['type'] == 'reset') {
-    if ($config['reset_remove_images']) {
+    if ($config['reset']['remove_images']) {
         // empty folders
         foreach ($config['foldersAbs'] as $folder) {
             if (is_dir($folder)) {
@@ -27,13 +27,13 @@ if ($data['type'] == 'reset') {
         }
     }
 
-    if ($config['reset_remove_mailtxt']) {
+    if ($config['reset']['remove_mailtxt']) {
         if (is_file(MAIL_FILE)) {
             unlink(MAIL_FILE); // delete file
         }
     }
 
-    if ($config['reset_remove_config']) {
+    if ($config['reset']['remove_config']) {
         // delete personal config
         if (is_file('../config/my.config.inc.php')) {
             unlink('../config/my.config.inc.php');
@@ -53,18 +53,15 @@ if ($data['type'] == 'config') {
 
     foreach ($config as $k => $conf) {
         if (is_array($conf)) {
-            if (!empty($data[$k]) && is_array($data[$k])) {
-                $newConfig[$k] = $data[$k];
-                continue;
-            }
-
             foreach ($conf as $sk => $sc) {
-                if (isset($data[$k][$sk]) && !empty($data[$k][$sk])) {
+                if (isset($data[$k][$sk])) {
                     if ($data[$k][$sk] == 'true') {
                         $newConfig[$k][$sk] = true;
                     } else {
                         $newConfig[$k][$sk] = $data[$k][$sk];
                     }
+                } elseif (isset($defaultConfig[$k][$sk])) {
+                    $newConfig[$k][$sk] = false;
                 }
             }
         } else {
@@ -80,37 +77,56 @@ if ($data['type'] == 'config') {
         }
     }
 
-    if ($newConfig['login_enabled']) {
-        if (isset($newConfig['login_password']) && !empty($newConfig['login_password'])) {
-            if (!($newConfig['login_password'] === $config['login_password'])) {
-                $hashing = password_hash($newConfig['login_password'], PASSWORD_DEFAULT);
-                $newConfig['login_password'] = $hashing;
+    if (isset($newConfig['login']['enabled']) && $newConfig['login']['enabled'] == true) {
+        if (isset($newConfig['login']['password']) && !empty($newConfig['login']['password'])) {
+            if (!($newConfig['login']['password'] === $config['login']['password'])) {
+                $hashing = password_hash($newConfig['login']['password'], PASSWORD_DEFAULT);
+                $newConfig['login']['password'] = $hashing;
             }
         } else {
-            $newConfig['login_enabled'] = false;
+            $newConfig['login']['enabled'] = false;
         }
     } else {
-        $newConfig['login_password'] = null;
+        $newConfig['login']['password'] = null;
     }
 
-    if ($newConfig['preview_mode'] != 'device_cam' && $newConfig['preview_mode'] != 'gphoto') {
-        $newConfig['previewCamTakesPic'] = false;
+    if ($newConfig['preview']['mode'] != 'device_cam' && $newConfig['preview']['mode'] != 'gphoto') {
+        $newConfig['preview']['camTakesPic'] = false;
     }
 
-    if ($newConfig['index_style'] === 'custom') {
+    if ($newConfig['ui']['style'] === 'custom') {
         if (
-            !is_readable('../template/custom.template.php') ||
-            !is_readable('../resources/css/custom_style.css') ||
-            !is_readable('../resources/css/custom_chromakeying.css') ||
+            !is_readable('../template/custom.template.php') &&
+            !is_readable('../resources/css/custom_style.css') &&
+            !is_readable('../resources/css/custom_chromakeying.css') &&
             !is_readable('../resources/css/custom_live_chromakeying.css')
         ) {
-            $newConfig['index_style'] = 'default';
+            $newConfig['ui']['style'] = 'default';
+        } else {
+            if (!file_exists('../template/custom.template.php')) {
+                copy('../template/modern.template.php', '../template/custom.template.php');
+            }
+            if (!file_exists('../resources/css/custom_style.css')) {
+                copy('../resources/css/modern_style.css', '../resources/css/custom_style.css');
+            }
+            if (!file_exists('../resources/css/custom_chromakeying.css')) {
+                copy('../resources/css/modern_chromakeying.css.css', '../resources/css/custom_chromakeying.css');
+            }
+            if (!file_exists('../resources/css/custom_live_chromakeying.css')) {
+                copy('../resources/css/modern_live_chromakeying.css', '../resources/css/custom_live_chromakeying.css');
+            }
         }
     }
 
     if ($os === 'windows') {
-        $newConfig['remotebuzzer_enabled'] = false;
-        $newConfig['synctodrive_enabled'] = false;
+        $newConfig['remotebuzzer']['enabled'] = false;
+        $newConfig['synctodrive']['enabled'] = false;
+    }
+
+    if ($newConfig['collage']['layout'] === '1+2') {
+        $newConfig['collage']['limit'] = 3;
+    } else {
+        $newConfig['collage']['limit'] = 4;
     }
 
     $content = "<?php\n\$config = " . var_export(arrayRecursiveDiff($newConfig, $defaultConfig), true) . ';';

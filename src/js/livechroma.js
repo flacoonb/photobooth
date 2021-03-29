@@ -1,4 +1,4 @@
-/* globals photoBooth MarvinColorModelConverter AlphaBoundary MarvinImage Seriously i18n*/
+/* globals photoBooth MarvinColorModelConverter AlphaBoundary MarvinImage Seriously rotaryController */
 /* exported setBackgroundImage setMainImage */
 let mainImage;
 let mainImageWidth;
@@ -57,7 +57,7 @@ function alphaBoundary(imageOut, radius) {
 
 // eslint-disable-next-line no-unused-vars
 function setMainImage(imgSrc) {
-    if (config.chroma_keying_variant === 'marvinj') {
+    if (config.keying.variant === 'marvinj') {
         const image = new MarvinImage();
         image.load(imgSrc, function () {
             mainImageWidth = image.getWidth();
@@ -109,9 +109,14 @@ function setMainImage(imgSrc) {
             chroma = seriously.effect('chroma');
             chroma.source = seriouslyimage;
             target.source = chroma;
-            const r = 98 / 255;
-            const g = 175 / 255;
-            const b = 116 / 255;
+            const color = config.keying.seriouslyjs_color;
+            const r = parseInt(color.substr(1, 2), 16) / 255;
+            const g = parseInt(color.substr(3, 2), 16) / 255;
+            const b = parseInt(color.substr(5, 2), 16) / 255;
+            if (config.dev.enabled) {
+                console.log('Chromakeying color:', color);
+                console.log('Red:', r, 'Green:', g, 'Blue:', b);
+            }
             chroma.screen = [r, g, b, 1];
             seriously.go();
             mainImage = new Image();
@@ -160,7 +165,7 @@ function drawCanvas() {
     }
 
     if (typeof mainImage !== 'undefined' && mainImage !== null) {
-        if (config.chroma_keying_variant === 'marvinj') {
+        if (config.keying.variant === 'marvinj') {
             ctx.drawImage(mainImage, 0, 0);
         } else {
             //important to fetch tmpimageout
@@ -195,7 +200,7 @@ function saveImage(cb) {
                 $('.chroma-control-bar').show();
                 $('.takeChroma').hide();
             }
-            if (config.allow_delete) {
+            if (config.picture.allow_delete) {
                 $('.deletebtn').css('visibility', 'visible');
                 $('.chroma-control-bar')
                     .find('.deletebtn')
@@ -203,12 +208,12 @@ function saveImage(cb) {
                     .on('click', (ev) => {
                         ev.preventDefault();
 
-                        const msg = i18n('really_delete_image');
-                        const really = confirm(data.filename + ' ' + msg);
+                        const msg = photoBooth.getTranslation('really_delete_image');
+                        const really = config.delete.no_request ? true : confirm(data.filename + ' ' + msg);
                         if (really) {
                             photoBooth.deleteImage(data.filename, (result) => {
                                 if (result.success) {
-                                    if (config.live_keying_show_all) {
+                                    if (config.live_keying.show_all) {
                                         photoBooth.deleteImage(photoBooth.chromaimage, (response) => {
                                             if (response.success) {
                                                 setTimeout(function () {
@@ -263,9 +268,10 @@ $('.backgroundPreview').on('click', function () {
 $('.takeChroma, .newchroma').on('click', function (e) {
     e.preventDefault();
     takingPic = true;
-    const chromaInfo = i18n('chromaInfoAfter');
+    const chromaInfo = photoBooth.getTranslation('chromaInfoAfter');
 
     photoBooth.thrill('chroma');
+
     if ($('.chroma-control-bar').is(':visible')) {
         $('.chroma-control-bar').hide();
         $('.backgrounds').hide();
@@ -273,12 +279,16 @@ $('.takeChroma, .newchroma').on('click', function (e) {
         setTimeout(() => {
             $('.chromaNote').show();
             $('.chromaNote').text(chromaInfo);
-        }, config.cntdwn_time * 1000);
+            $('.chroma-control-bar > .takeChroma').hide();
+            $('.chroma-control-bar > .deleteBtn').hide();
+            $('.chroma-control-bar > .reloadPage').show();
+            $('.chroma-control-bar').show();
+        }, config.picture.cntdwn_time * 1000);
     }
 });
 
 $(document).on('keyup', function (ev) {
-    if (config.photo_key && parseInt(config.photo_key, 10) === ev.keyCode) {
+    if (config.picture.key && parseInt(config.picture.key, 10) === ev.keyCode) {
         if (!backgroundImage) {
             console.log('Please choose a background first!');
         } else if (needsReload) {
@@ -286,23 +296,23 @@ $(document).on('keyup', function (ev) {
         } else if (!takingPic) {
             $('.closeGallery').trigger('click');
             $('.takeChroma').trigger('click');
-        } else if (config.dev && takingPic) {
+        } else if (config.dev.enabled && takingPic) {
             console.log('Taking photo already in progress!');
         }
     }
 
-    if (config.collage_key && parseInt(config.collage_key, 10) === ev.keyCode) {
+    if (config.collage.key && parseInt(config.collage.key, 10) === ev.keyCode) {
         if (!backgroundImage) {
             console.log('Please choose a background first!');
         } else if (needsReload) {
             console.log('Please reload the page to take a new Picture!');
         } else if (!takingPic) {
             $('.closeGallery').trigger('click');
-            if (config.dev) {
+            if (config.dev.enabled) {
                 console.log('Collage key pressed. Not possible on live chroma, triggering photo now.');
             }
             $('.takeChroma').trigger('click');
-        } else if (config.dev && takingPic) {
+        } else if (config.dev.enabled && takingPic) {
             console.log('Taking photo already in progress!');
         }
     }
@@ -320,4 +330,14 @@ $('.gallerybtn').on('click', function (e) {
     e.preventDefault();
 
     photoBooth.openGallery($(this));
+});
+
+// Close Button
+$('.closebtn').on('click', function () {
+    location.assign('./index.php');
+});
+
+$(document).ready(function () {
+    console.log('DOM ready');
+    rotaryController.focusSet('#start');
 });

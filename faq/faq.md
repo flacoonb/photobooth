@@ -64,9 +64,15 @@ Photobooth can be easylie styled for your personal needs via admin panel, open [
 To use a private custom index you need to create the following files:
 - `resources/css/custom_style.css`
   - Optional: `src/sass/custom_style.scss` (`yarn build` will create the `resources/css/custom_style.css` out of it)
+- `resources/css/custom_chromakeying.css`
+  - Optional: `src/sass/custom_chromakeying.scss` (`yarn build` will create the `resources/css/custom_chromakeying.css` out of it)
+- `resources/css/custom_live_chromakeying`
+  - Optional: `src/sass/custom_live_chromakeying.scss` (`yarn build` will create the `resources/css/custom_live_chromakeying.css` out of it)
 - `template/custom.template.php`
 
-Once you've created these 2 needed files you will be able to use the selection `custom` from the `"Styling"` option.  
+At least one of these custom style files need to exist! If other custom style files are missing a copy of the modern style file will be used.   
+Once you've created needed files you will be able to use the selection `custom` from the `"Styling"` option.  
+
 **Please note**: the custom style and template will not be tracked by git to avoid sharing by accident!  
 
 If you have e.g. private backgrounds (maybe files without a usable license) you can create a folder called `private` inside the root of your Photbooth source. This folder (and subfolders) will not be tracked by git to avoid sharing by accident!  
@@ -106,45 +112,101 @@ Follow the steps mentioned here: [How to Fix NGINX 413 Request Entity Too Large 
 
 <hr>
 
-### Can I use Hardware Button to take a Picture on my Raspberry Pi?
-When the photobooth display / screen is directly connected to the Raspberry Pi, this is a simple way to use a hardware button connected on GPIO24 to trigger a photo. Set the "Take Pictures key" to `13` (enter key) via Admin panel to specify the key. Next you have to install some dependencies:
+### Can I use Hardware Button on my Raspberry Pi, to take a Picture ?
+Yes, the **Hardware Button** feature enables to control Photobooth through hardware buttons connected to Raspberry GPIO pins . This works for directly connected screens and as well for WLAN connected screen (i.e. iPad). Configuration takes place in the admin settings - Hardware Button section.
+
+The Hardware Button functionality supports two separate modes of operation (select via admin panel):
+- **Button Mode**: Distinct hardware buttons can be connected to distinct GPIOs. Each button will trigger a separate functionality (i.e. take photo).
+- **Rotary Mode**: A rotary encoder connected to GPIOs will drive the input on the screen. This enables to use the rotary to scroll through the Photobooth UI buttons, and click to select actions. 
+Modes can not be combined.
+
+In any mode, Photobooth will watch GPIOs for a PIN_DOWN event - so the hardware button needs to pull the GPIO to ground, for to trigger. This requires the GPIOs to be configured in PULLUP mode - always. 
+
+Troubleshooting / Debugging:
+
+- **Important: For WLAN connected screens you must make sure to set the IP address of the Photobooth web server in the admin settings - section "General"**. The loopback IP (127.0.0.1) does not work, it has to be the exact IP address of the Photobooth web server, to which the remote display connects to.
+- Switch Photobooth to DEV mode. (admin screen -> expert view -> general section)
+- Reload the Photobooth homepage
+- Check the browser developer console for error logs
+- Check the server logs for errors (file `data/tmp/remotebuzzer_server.log`).
+- If there is no errors logged but hardware buttons still do not trigger
+ - GPIO interrupts might be disabled. Check file `/boot/config.txt` and remove / disable the following overlay `dtoverlay=gpio-no-irq` to enable interrupts for GPIOs.
+ - GPIOs may not be configured as PULLUP. The configuration for this is done in fie `/boot/config.txt` by adding the GPIO numbers in use as follows - you **must reboot** the Raspberry Pi in order to activate changes in this setting. 
 
 ```
-sudo apt install libudev-dev
-sudo pip install python-uinput
-echo "uinput" | sudo tee -a /etc/modules
+         gpio=16,20,21,26=pu
 ```
 
-After a reboot (`sudo shutdown -r now`), you should check if the uinput kernel module is loaded by executing `lsmod | grep uinput`. If you get some output, everything is fine.
+- For the Shutdown button to work, `www-data` needs to have the necessary sudo permissions. This is done by the `install-raspian.sh` script or can be manually added as
 
-You also need to run a python script in background to read the state of GPIO24 and send the key if hardware button is pressed to trigger the website to take a photo.
 ```
-sudo crontab -e
-@reboot python /var/www/html/button.py &
+     cat >> /etc/sudoers.d/020_www-data-shutdown << EOF
+     www-data ALL=(ALL) NOPASSWD: /sbin/shutdown
+     EOF
 ```
 
-<hr>
+As of Photobooth v3, hardware button support is fully integrated into Photobooth. Therefore the `button.py` script has been removed from the distribution. In case you are using this script and for continued backward compatibility please do not activate the Remote Buzzer Hardware Button feature in the admin GUI. Please note that continued backward compatibility is not guaranteed and in case of issues please switch to the integrated functionality.
 
-### Hardware Button for WLAN connected screen (i.e. iPad) - Remote Buzzer Server
-This feature enables a GPIO pin connected hardware button / buzzer for a setup where the display / screen is connected via WLAN / network to the photobooth webserver (e.g. iPad). Configuration takes place in the admin settings - Remote Buzzer Server area.
-
-**Important: You must make sure to set the IP address of the Photobooth web server in the admin settings - section "General"**. The loopback IP (127.0.0.1) does not work, it has to be the exact IP address of the Photobooth web server, to which the remote display connects to. 
-
-Debugging: switch on dev settings for server logs to be written to the "tmp" directory of the photobooth installation (i.e. `data/tmp/io_server.log`). Clients will log server communication information to the browser console.
-
-If you experience crashes or access permission problems to GPIO pins, check [https://www.npmjs.com/package/rpio](https://www.npmjs.com/package/rpio) for additional settings required on the Pi
 
 ***************
-Hardware Buzzer / Button
+**Button Mode**
 ***************
-The hardware buzzer connects to a GPIO pin, the server will watch for a PIN_DOWN event (pull to ground). This will initiate a message to the photobooth screen over network / WLAN, to trigger the action (thrill).
+The server supports up to three connected hardware buttons for the following functionalities:
 
-- Short button press (default <= 2 sec) will trigger a single picture
-- Long button press (default > 2 sec) will trigger a collage
- - If collage is configured with interruption, next button presses will trigger the next collage pictures. 
- - If collage is disabled in the admin settings, long button press also triggers a single picture
+1) **Picture Button**
 
-After triggered, the hardware button remains disabled until an action (picture / collage) has fully completed. Then the hardware button re-arms / is active again.
+- Defaults to GPIO21
+- Short button press (default <= 2 sec) will trigger a single picture in Photobooth
+- Long button press (default > 2 sec) will trigger a collage in Photobooth
+
+Note:
+ -  If collage is configured with interruption, next button presses will trigger the next collage pictures. 
+ -  If collage is disabled in the admin settings, long button press also triggers a single picture
+ -  If the collage button is activated (see next), the picture button will never trigger a collage, regardless
+
+2)  **Collage Button**
+
+- Defaults to GPIO20
+- Button press will trigger a collage in Photobooth.
+
+Note:
+- If collage is configured with interruption, next button presses will trigger the next collage pictures. 
+- If collage is disabled in the admin settings (Collage section), this button will do nothing.
+
+3) **Shutdown Button**
+
+- Defaults to GPIO16
+- This button will initate a safe system shutdown and halt (`shutdown -h now`).
+
+Note:
+- Hold the button for a defined time to initiate the shut down (defaults to 5 seconds). This can be adjusted in the admin settings.
+- The shutdown button will only trigger if there is currently no action in progress in Photobooth (picture, collage). 
+
+After any button is triggered, all hardware button remain disabled until the action (picture / collage) completed. Once completed, the hardware buttons re-arms / are active again.
+
+***************
+**Rotary Mode**
+***************
+In rotary mode a rotary encoder (i.e. [KY-040](https://sensorkit.en.joy-it.net/index.php?title=KY-040_Rotary_encoder)) is connected to the GPIOs. Turning the rotary left / right will navigate through the currently visible set of buttons on the screen. Button press on the rotary will activate the currently highlighted button in Photobooth.
+
+The wiring layout is
+
+```
+Button                          Rotary Encoder
+Mode           Raspberry        Mode
+
+Picture  ---   GPIO 21    ---   DT
+Collage  ---   GPIO 20    ---   CLK
+Shutdown ---   GPIO 16    ---   SW
+                3V3       ---   +
+                GND       ---   GND
+```
+
+Known limitations:
+The following elements are currently not supported and not accessible through the rotary navigation
+- Full Screen Mode button: Looks like modern browser only allow to change to full screen mode upon user gesture. It seems not possible to change to full-screen using Javascript.
+- Photoswipe download button: Not needed for Rotary Control. (well, if you can come up with a decent use-case, let us know).
+- Delete Picture
 
 **************
 Other Remote Trigger (experimental)
@@ -155,7 +217,7 @@ The trigger server controls and coordinates sending commands via socket.io to th
 - Commands: `start-picture`, `start-collage`
 - Response: `completed`  will be emitted to the client, once photobooth finished the task
 
-This functionality is experimental and largely untested. 
+This functionality is experimental and largely untested. Not sure if there is a use-case but if you have one, happy to learn about it. Currently this does not support rotary encoder use but could be if needed.
 
 <hr>
 

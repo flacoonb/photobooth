@@ -41,7 +41,7 @@ const parseConfig = (config) => {
     try {
         return {
             dataAbsPath: config.foldersAbs.data,
-            drive: config.synctodrive_target
+            drive: config.synctodrive.target
         };
     } catch (err) {
         log('ERROR: unable to parse sync-to-drive config', err);
@@ -200,7 +200,7 @@ const phpConfig = getConfigFromPHP();
 
 if (!phpConfig) {
     process.exit();
-} else if (!phpConfig.synctodrive_enabled) {
+} else if (!phpConfig.synctodrive.enabled) {
     log('WARN: Sync script disabled by config - exiting');
     process.exit();
 }
@@ -210,7 +210,7 @@ const parsedConfig = parseConfig(phpConfig);
 log('USB target ', ...parsedConfig.drive);
 
 /* WRITE PROCESS PID FILE */
-writePIDFile(path.join(phpConfig.folders.tmp, 'synctodrive_server.pid'));
+writePIDFile(path.join(phpConfig.foldersRoot.tmp, 'synctodrive_server.pid'));
 
 /* INSTALL HANDLER TO MONITOR CHILD PROCESS EXITS */
 myEmitter.on('rsync-completed', (childPID) => {
@@ -256,11 +256,11 @@ const signalHandler = async (signal) => {
 
 /* START FOREVER LOOP */
 log('Starting server process');
-log(`Interval is [${phpConfig.synctodrive_interval}] seconds`);
+log(`Interval is [${phpConfig.synctodrive.interval}] seconds`);
 
 const syncLoop = () => {
     if (rsyncSemaphore) {
-        log(`WARN: Sync in progress, waiting for [${phpConfig.synctodrive_interval}] seconds`);
+        log(`WARN: Sync in progress, waiting for [${phpConfig.synctodrive.interval}] seconds`);
 
         return;
     }
@@ -289,4 +289,4 @@ const syncLoop = () => {
     }
 };
 
-setInterval(syncLoop, phpConfig.synctodrive_interval * 1000);
+setInterval(syncLoop, phpConfig.synctodrive.interval * 1000);

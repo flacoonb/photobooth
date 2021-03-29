@@ -1,4 +1,4 @@
-/* globals MarvinColorModelConverter AlphaBoundary MarvinImage i18n Seriously */
+/* globals MarvinColorModelConverter AlphaBoundary MarvinImage i18n Seriously initRemoteBuzzerFromDOM rotaryController */
 /* exported setBackgroundImage */
 let mainImage;
 let mainImageWidth;
@@ -9,6 +9,18 @@ let seriously;
 let target;
 let chroma;
 let seriouslyimage;
+
+const getTranslation = function (key) {
+    const translation = i18n(key, config.ui.language);
+    const fallbackTranslation = i18n(key, 'en');
+    if (translation) {
+        return translation;
+    } else if (fallbackTranslation) {
+        return fallbackTranslation;
+    }
+
+    return key;
+};
 
 function greenToTransparency(imageIn, imageOut) {
     for (let y = 0; y < imageIn.getHeight(); y++) {
@@ -55,7 +67,7 @@ function alphaBoundary(imageOut, radius) {
 }
 
 function setMainImage(imgSrc) {
-    if (config.chroma_keying_variant === 'marvinj') {
+    if (config.keying.variant === 'marvinj') {
         const image = new MarvinImage();
         image.load(imgSrc, function () {
             mainImageWidth = image.getWidth();
@@ -107,9 +119,14 @@ function setMainImage(imgSrc) {
             chroma = seriously.effect('chroma');
             chroma.source = seriouslyimage;
             target.source = chroma;
-            const r = 98 / 255;
-            const g = 175 / 255;
-            const b = 116 / 255;
+            const color = config.keying.seriouslyjs_color;
+            const r = parseInt(color.substr(1, 2), 16) / 255;
+            const g = parseInt(color.substr(3, 2), 16) / 255;
+            const b = parseInt(color.substr(5, 2), 16) / 255;
+            if (config.dev.enabled) {
+                console.log('Chromakeying color:', color);
+                console.log('Red:', r, 'Green:', g, 'Blue:', b);
+            }
             chroma.screen = [r, g, b, 1];
             seriously.go();
             mainImage = new Image();
@@ -160,7 +177,7 @@ function drawCanvas() {
     }
 
     if (typeof mainImage !== 'undefined' && mainImage !== null) {
-        if (config.chroma_keying_variant === 'marvinj') {
+        if (config.keying.variant === 'marvinj') {
             ctx.drawImage(mainImage, 0, 0);
         } else {
             //important to fetch tmpimageout
@@ -179,7 +196,7 @@ function calculateAspectRatioFit(srcWidth, srcHeight, maxWidth, maxHeight) {
 }
 
 function printImage(filename, cb) {
-    const errormsg = i18n('error');
+    const errormsg = getTranslation('error');
 
     if (isPrinting) {
         console.log('Printing already: ' + isPrinting);
@@ -208,12 +225,12 @@ function printImage(filename, cb) {
                         if (data.error) {
                             $('#print_mesg').empty();
                             $('#print_mesg').html(
-                                '<div class="modal__body"><span>' + i18n('printing') + '</span></div>'
+                                '<div class="modal__body"><span>' + getTranslation('printing') + '</span></div>'
                             );
                         }
                         cb();
                         isPrinting = false;
-                    }, config.printing_time);
+                    }, config.print.time);
                 },
                 error: (jqXHR, textStatus) => {
                     console.log('An error occurred: ', textStatus);
@@ -225,7 +242,9 @@ function printImage(filename, cb) {
                     setTimeout(function () {
                         $('#print_mesg').removeClass('modal--show');
                         $('#print_mesg').empty();
-                        $('#print_mesg').html('<div class="modal__body"><span>' + i18n('printing') + '</span></div>');
+                        $('#print_mesg').html(
+                            '<div class="modal__body"><span>' + getTranslation('printing') + '</span></div>'
+                        );
                         cb();
                         isPrinting = false;
                     }, 5000);
@@ -295,7 +314,7 @@ function closeHandler(ev) {
 }
 
 $(document).on('keyup', function (ev) {
-    if (config.use_print_chromakeying && config.print_key && parseInt(config.print_key, 10) === ev.keyCode) {
+    if (config.print.from_chromakeying && config.print.key && parseInt(config.print.key, 10) === ev.keyCode) {
         if (isPrinting) {
             console.log('Printing already in progress!');
         } else {
@@ -324,4 +343,7 @@ $(document).ready(function () {
         $('#mainCanvas').css('height', canvasHeight - diff + 'px');
     }
     $('.canvasWrapper').removeClass('initial');
+
+    initRemoteBuzzerFromDOM();
+    rotaryController.focusSet('.chromawrapper');
 });

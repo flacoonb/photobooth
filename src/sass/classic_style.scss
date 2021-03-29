@@ -167,7 +167,28 @@
   width: 100%;
 }
 
+.loaderImage {
+  display: none;
+  width: 90%;
+  height: 90%;
+  position: absolute;
+  top: 40%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  z-index: 101;
+  background: center center no-repeat;
+  background-size: contain;
+  @media (max-width: 767px) {
+    width: 80%;
+    height: 80%;
+  }
+}
+
 .loading {
+  position: absolute;
+  bottom: 1.5em;
+  left: 0;
+  z-index: 102;
   font-size: 3.125em;
   text-align: center;
   width: 100%;
@@ -178,6 +199,10 @@
 
   .btn {
     font-size: 0.4em;
+  }
+
+  @media (max-width: 767px) {
+    bottom: 0.5em;
   }
 }
 
@@ -362,10 +387,10 @@ hr.small {
   height: 100%;
   width: 100%;
   object-fit: cover;
-  transform: rotate($ipCamPreviewRotation);
+  transform: rotate($previewRotation);
 
   &.streaming {
-    background-image: $ipcamBackground;
+    background-image: $urlBackground;
   }
 }
 
@@ -410,4 +435,23 @@ hr.small {
   .takePic {
     bottom: auto;
   }
+}
+
+.gallery__close:active,
+.gallery__close:hover,
+.gallery__close:focus,
+.gallery__close.focused,
+.gallery__img:active > figure,
+.gallery__img:focus > figure,
+.gallery__img:hover > figure,
+.gallery__img.focused > figure,
+.gallery__img:active > img,
+.gallery__img:focus > img,
+.gallery__img:hover > img,
+.gallery__img.focused > img {
+  opacity: 0.6;
+}
+
+.pswp-rotary-focus {
+  background: $mainColor !important;
 }
